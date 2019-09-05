@@ -9,13 +9,31 @@ import sys
 import time
 import subprocess
 import datetime
+import argparse
 from random import random, randint
 from pyrrd.rrd import DataSource, RRA, RRD
+import psutil
 
 KEEP_GOING = True
 rrd_file = 'process_memory.rrd'
 graph_file = 'process_memory.png'
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    'pid',
+    help='The process id to graph',
+)
+parser.add_argument(
+    '--graph-name',
+    help='The name put on the graph produced',
+    default='Process Memory',
+)
+parser.add_argument(
+    '--children',
+    help='Include the memory usage of all decendent processes',
+    default=False,
+    action='store_true',
+)
 
 def memory(pid):
     #/bin/ps --no-headers -o size,rss -p 1677
@@ -29,23 +47,34 @@ def memory(pid):
     return vsz, rss
 
 
+def pid_memory(pid):
+    proc = psutil.Process(pid)
+    mem_info = proc.memory_info()
+    return mem_info.vms / 1024, mem_info.rss / 1024
+
+
+def walk_children(pid):
+    proc = psutil.Process(pid)
+    for sub_proc in proc.children():
+        yield sub_proc.pid
+        for sub_pid in walk_children(sub_proc.pid):
+            yield sub_pid
+
+def pid_and_subs_memory(pid):
+    vsz, rss = pid_memory(pid)
+    for child_pid in walk_children(pid):
+        c_vsz, c_rss = pid_memory(child_pid)
+        vsz += c_vsz
+        rss += c_rss
+    return vsz, rss
+
+
 def sigint_handler(signal, frame):
     global KEEP_GOING
     KEEP_GOING = False
 
 def main():
-    if len(sys.argv) == 1:
-        print("pid needed")
-        sys.exit(1)
-    elif len(sys.argv) > 3:
-        print("Too many args")
-        sys.exit()
-    elif len(sys.argv) == 3:
-        pid = sys.argv[1]
-        graph_name = sys.argv[2]
-    else:
-        graph_name = 'Memory Usage'
-        pid = sys.argv[1]
+    ns = parser.parse_args()
     signal.signal(signal.SIGINT, sigint_handler)
     dss = [
         DataSource(dsName='vsz', dsType='GAUGE', heartbeat=2),
@@ -66,7 +95,10 @@ def main():
     start = time.time()
     print("Starting at %d." % start)
     while KEEP_GOING:
-        vsz, rss = memory(pid)
+        if ns.children:
+            vsz, rss = pid_and_subs_memory(ns.pid)
+        else:
+            vsz, rss = pid_memory(ns.pid)
         #print("sample {} {}".format(size, rss))
         if vsz == 0 and rss == 0:
             break
@@ -94,7 +126,7 @@ def main():
         'rrdtool',
         'graph',
         '--title',
-        graph_name,
+        ns.graph_name,
         graph_file,
         '--start',
         str(int(start)),
