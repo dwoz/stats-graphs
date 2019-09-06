@@ -94,9 +94,9 @@ def main():
         DataSource(dsName='rss', dsType='GAUGE', heartbeat=2)
     ]
     rras = [
-        RRA(cf='AVERAGE', xff=0.5, steps=10, rows=1000),
+        RRA(cf='AVERAGE', xff=0.5, steps=10, rows=3000),
         #RRA(cf='AVERAGE', xff=0.5, steps=1, rows=100)
-        RRA(cf='LAST', xff=0.5, steps=1, rows=100000)
+        RRA(cf='LAST', xff=0.5, steps=1, rows=300000)
     ]
     try:
 		os.remove(rrd_file)
