@@ -22,6 +22,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     'pid',
     help='The process id to graph',
+    type=int,
 )
 parser.add_argument(
     '--graph-name',
