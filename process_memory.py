@@ -58,23 +58,27 @@ def pid_memory(pid):
 
 
 def walk_children(pid):
-    proc = psutil.Process(pid)
-    for sub_proc in proc.children():
-        yield sub_proc.pid
-        for sub_pid in walk_children(sub_proc.pid):
-            yield sub_pid
+    try:
+        proc = psutil.Process(pid)
+        for sub_proc in proc.children():
+            yield sub_proc.pid
+            for sub_pid in walk_children(sub_proc.pid):
+                yield sub_pid
+    except psutil.NoSuchProcess:
+        pass
 
 def pid_and_subs_memory(pid):
     vsz, rss = pid_memory(pid)
     if vsz == 0 and rss == 0:
         return vsz, rss
     for child_pid in walk_children(pid):
-        try:
-            c_vsz, c_rss = pid_memory(child_pid)
-        except psutil.NoSuchProcess:
-            continue
-        vsz += c_vsz
-        rss += c_rss
+        if pid:
+            try:
+                c_vsz, c_rss = pid_memory(child_pid)
+            except psutil.NoSuchProcess:
+                continue
+            vsz += c_vsz
+            rss += c_rss
     return vsz, rss
 
 
