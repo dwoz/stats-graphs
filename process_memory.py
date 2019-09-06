@@ -49,8 +49,11 @@ def memory(pid):
 
 
 def pid_memory(pid):
-    proc = psutil.Process(pid)
-    mem_info = proc.memory_info()
+    try:
+        proc = psutil.Process(pid)
+        mem_info = proc.memory_info()
+    except psutil.NoSuchProcess:
+        return 0, 0
     return mem_info.vms / 1024, mem_info.rss / 1024
 
 
@@ -63,8 +66,13 @@ def walk_children(pid):
 
 def pid_and_subs_memory(pid):
     vsz, rss = pid_memory(pid)
+    if vsz == 0 and rss == 0:
+        return vsz, rss
     for child_pid in walk_children(pid):
-        c_vsz, c_rss = pid_memory(child_pid)
+        try:
+            c_vsz, c_rss = pid_memory(child_pid)
+        except psutil.NoSuchProcess:
+            continue
         vsz += c_vsz
         rss += c_rss
     return vsz, rss
